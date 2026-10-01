@@ -17,9 +17,10 @@ def update_plan():
         return plan
     t = html.unescape(re.sub(r"<[^>]+>", " ", t))
     found = {}
-    for n, day, month, year in re.findall(r"Runda\s+(\d+)\s+(\d{1,2})\s+(\w+)\s+(\d{4})", t):
+    for n, day, month, year, venue in re.findall(r"Runda\s+(\d+)\s+(\d{1,2})\s+(\w+)\s+(\d{4})\s*(?:\(\s*(\w+)\s*\))?", t):
         if month.lower() in MONTHS:
-            found.setdefault(year, {})[int(n)] = f"{year}-{MONTHS[month.lower()]:02d}-{int(day):02d}"
+            venue = "Hala" if venue.lower() == "hala" else "Stadion" if venue.lower() == "stadion" else None
+            found.setdefault(year, {})[int(n)] = [f"{year}-{MONTHS[month.lower()]:02d}-{int(day):02d}", venue]
     for year, rounds in found.items():
         plan[year] = [rounds[k] for k in sorted(rounds)]
     json.dump(plan, open(path, "w", encoding="utf-8"), indent=1)

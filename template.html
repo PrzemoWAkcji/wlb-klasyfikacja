@@ -82,7 +82,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .cathead h2 span { color: var(--muted); font-weight: 500; }
 .cathead .meta { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 
-.record { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 12px; font-size: 14.5px; color: var(--muted); }
+.record { display: grid; gap: 6px; margin-bottom: 12px; font-size: 14.5px; color: var(--muted); }
+.rec-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.rec-row .rv { font: 600 13px/1 var(--f-body); color: var(--ink); width: 58px; }
+thead th.rnd small.v { margin-top: 1px; font-size: 11px; letter-spacing: .02em; }
 .record .tag { font: 600 12px/1 var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
 .record .rt { font: 700 22px/1 var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; }
 .record button { font: 600 14.5px var(--f-body); color: var(--ink); background: none; border: 0; padding: 0;
@@ -169,7 +172,7 @@ tr:hover td.c-name { background: var(--surface-2); }
     <span class="res"><span class="p m2">2</span>2.</span>
     <span class="res"><span class="p m3">3</span>3.</span>
     <span class="res drop"><span class="p">9</span>start spoza 7 najlepszych</span>
-    <span class="res rec"><span class="t">8,45</span></span><span>rekord WLB w tej kategorii wiekowej</span>
+    <span class="res rec"><span class="t">8,45</span></span><span>rekord WLB w tej kategorii wiekowej (osobno stadion i hala)</span>
     <span><span class="pill warn">brakuje 2</span> może jeszcze się zakwalifikować</span>
     <span><span class="pill off">za mało startów</span> nie zdąży już zebrać 7</span>
   </div>
@@ -181,7 +184,7 @@ tr:hover td.c-name { background: var(--surface-2); }
         <li>Do klasyfikacji potrzeba co najmniej <b id="rMin">7</b> startów na danym dystansie. Liczy się suma <b id="rBest">7</b> najlepszych.</li>
         <li>Wygrywa najmniejsza suma. Przy remisie decyduje najlepszy czas w sezonie.</li>
         <li>Biegi łączone (np. „13–14 lat”) rozdzielamy na roczniki i przeliczamy miejsca osobno.</li>
-        <li>Rekord WLB to najlepszy czas w danym wieku (sezon minus rocznik), płci i dystansie ze wszystkich sezonów od 2021 roku, na stadionie i w hali łącznie.</li>
+        <li>Rekord WLB to najlepszy czas w danym wieku (sezon minus rocznik), płci i dystansie ze wszystkich sezonów ligi, osobno na stadionie i w hali (wg obiektu podanego w Roster Athletics).</li>
       </ul></div>
     <div><h3>Skąd dane</h3>
       <p>Wyniki pochodzą z publicznych wyników zawodów w Roster Athletics (organizator: Warszawska Liga Biegowa). Liczone są tylko ukończone biegi z czasem; DNS, DNF i DQ się nie liczą.</p>
@@ -245,23 +248,25 @@ function render() {
   $("catTitle").innerHTML = `${st.s - st.y} lat <span>· ${G[st.g].toLowerCase()} · ${st.d} m · rocznik ${st.y}</span>`;
   $("catMeta").textContent = `${c.rows.length} ${c.rows.length === 1 ? "zawodnik" : "zawodników"} · ${nCls} sklasyfikowanych`;
 
-  // rekord WLB w tej kategorii wiekowej
+  // rekordy WLB w tej kategorii wiekowej, osobno stadion (S) i hala (H)
   const age = st.s - st.y;
-  const rec = (DATA.records || {})[`${st.d}-${st.g}-${age}`];
-  const isRec = (a, i) => rec && rec.h.some(x => x.s === String(st.s) && x.ri === i && String(x.a) === String(a));
-  const recBox = $("record");
-  if (rec) {
-    const seen = new Set(), holders = rec.h.filter(x => !seen.has(x.a) && seen.add(x.a));
-    recBox.innerHTML = `<span class="tag">Rekord WLB · ${age} lat · ${st.d} m</span><span class="rt">${fmtT(rec.t)}</span>` +
-      holders.map((x, k) => `<span><button type="button" data-k="${k}">${esc(x.n)}</button>, ${shortDate(x.date)}.${x.s}${x.c ? ` · ${esc(x.c)}` : ""}</span>`).join("");
-    recBox.onclick = e => { const b = e.target.closest("button"); if (!b) return; const x = holders[+b.dataset.k];
-      Object.assign(st, { s: x.s, y: x.y, hl: x.a }); render(); };
-    recBox.hidden = false;
-  } else recBox.hidden = true;
+  const recs = [["S", "Stadion"], ["H", "Hala"]]
+    .map(([v, label]) => ({ v, label, rec: (DATA.records || {})[`${st.d}-${st.g}-${age}-${v}`] })).filter(x => x.rec);
+  const recOf = (a, i) => recs.find(({ rec }) => rec.h.some(x => x.s === String(st.s) && x.ri === i && String(x.a) === String(a)));
+  const recBox = $("record"), jumps = [];
+  recBox.innerHTML = recs.length ? `<span class="tag">Rekordy WLB · ${age} lat · ${st.d} m</span>` + recs.map(({ label, rec }) => {
+    const seen = new Set();
+    return `<div class="rec-row"><span class="rv">${label}</span><span class="rt">${fmtT(rec.t)}</span>` +
+      rec.h.filter(x => !seen.has(x.a) && seen.add(x.a)).map(x => { jumps.push(x);
+        return `<span><button type="button" data-k="${jumps.length - 1}">${esc(x.n)}</button>, ${shortDate(x.date)}.${x.s}${x.c ? ` · ${esc(x.c)}` : ""}</span>`; }).join("") + `</div>`;
+  }).join("") : "";
+  recBox.onclick = e => { const b = e.target.closest("button"); if (!b) return; const x = jumps[+b.dataset.k];
+    Object.assign(st, { s: x.s, y: x.y, hl: x.a }); render(); };
+  recBox.hidden = !recs.length;
 
   const R = S.rounds;
   let h = `<thead><tr><th class="c-rank" title="Miejsce w klasyfikacji">#</th><th class="c-name">Imię i nazwisko</th>`;
-  h += R.map(r => `<th class="rnd${r.id ? "" : " future"}" title="${r.venue || "runda zaplanowana"}">R${r.n}<small>${shortDate(r.date)}</small></th>`).join("");
+  h += R.map(r => `<th class="rnd${r.id ? "" : " future"}" title="${r.id ? r.venue : "runda zaplanowana"}">R${r.n}<small>${shortDate(r.date)}</small><small class="v">${(r.venue || "").toLowerCase()}</small></th>`).join("");
   h += `<th>Punkty<br>razem</th><th>Najlepsze ${DATA.rules.best}</th><th>Starty</th><th>Najlepszy<br>wynik</th><th>Ranking<br>wg czasu</th></tr></thead><tbody>`;
   let prevCls = true;
   for (const row of c.rows) {
@@ -279,12 +284,12 @@ function render() {
       const x = row.r[i];
       if (!x) { h += `<td class="res"></td>`; return; }
       const [p, t, counted] = x;
-      const r1 = isRec(row.a, i);
-      const tip = [r1 ? `Rekord WLB (${age} lat, ${st.d} m)` : "", counted ? "" : "Nie liczy się do 7 najlepszych"].filter(Boolean).join(" · ");
+      const r1 = recOf(row.a, i);
+      const tip = [r1 ? `Rekord WLB – ${r1.label.toLowerCase()} (${age} lat, ${st.d} m)` : "", counted ? "" : "Nie liczy się do 7 najlepszych"].filter(Boolean).join(" · ");
       h += `<td class="res${counted ? "" : " drop"}${r1 ? " rec" : ""}"${tip ? ` title="${tip}"` : ""}><span class="p${p <= 3 ? " m" + p : ""}">${p}</span><span class="t">${fmtT(t)}</span></td>`;
     });
-    const pbRec = rec && rec.t === row.pb;
-    h += `<td class="num">${row.tot}</td><td class="num">${pill}</td><td class="num">${row.s}</td><td class="num${pbRec ? " rec" : ""}"${pbRec ? ` title="Rekord WLB (${age} lat, ${st.d} m)"` : ""}>${fmtT(row.pb)}</td><td class="num">${row.tr}</td></tr>`;
+    const pbRec = recs.find(({ rec }) => rec.t === row.pb && rec.h.some(x => x.s === String(st.s) && String(x.a) === String(row.a)));
+    h += `<td class="num">${row.tot}</td><td class="num">${pill}</td><td class="num">${row.s}</td><td class="num${pbRec ? " rec" : ""}"${pbRec ? ` title="Rekord WLB – ${pbRec.label.toLowerCase()} (${age} lat, ${st.d} m)"` : ""}>${fmtT(row.pb)}</td><td class="num">${row.tr}</td></tr>`;
   }
   h += `</tbody>`;
   $("tbl").innerHTML = c.rows.length ? h : `<tbody><tr><td class="empty">Brak wyników w tej kategorii.</td></tr></tbody>`;

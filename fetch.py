@@ -27,6 +27,11 @@ def fetch_meeting(m, force=False):
     # zakończone rundy trzymamy w cache, ale przez 14 dni pobieramy je ponownie (protesty, korekty wyników)
     recent = datetime.strptime(m["startDateTime"][:10], "%Y-%m-%d") > datetime.now() - timedelta(days=14)
     if os.path.exists(path) and not force and m["meetingStatus"] == "Finished" and not recent:
+        data = json.load(open(path, encoding="utf-8"))
+        if "season" not in data["meeting"]:     # starszy cache bez typu obiektu – dopisujemy go
+            data["meeting"]["season"] = req(f"/meeting/{mid}/details").get("season")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
         return path
     details = req(f"/meeting/{mid}/details")
     events = {e["eventIdPk"]: e["eventName"] for e in details.get("sportEvents", [])}
@@ -65,6 +70,7 @@ def fetch_meeting(m, force=False):
         for part in ex.map(one, top):
             rows += part
     meta = {k: m.get(k) for k in ("meetingId", "meetingName", "startDateTime", "meetingStatus", "venueName")}
+    meta["season"] = details.get("season")      # Indoor = hala, Outdoor = stadion
     data = {"meeting": meta, "rows": rows}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)

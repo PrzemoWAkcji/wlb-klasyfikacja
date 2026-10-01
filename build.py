@@ -22,18 +22,20 @@ for d in meetings:
     seasons[int(d["meeting"]["startDateTime"][:4])].append(d)
 
 def fmt_round(m, n):
+    # typ obiektu z Roster: Indoor = hala, Outdoor = stadion
     return {"n": n, "date": m["startDateTime"][:10], "id": m["meetingId"],
-            "venue": "Hala" if "HALA" in m["meetingName"].upper() or "Hala" in (m.get("venueName") or "") else "Stadion"}
+            "venue": "Hala" if m.get("season") == "Indoor" else "Stadion"}
 
 out = {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
        "rules": {"minStarts": MIN_STARTS, "best": BEST_N}, "seasons": {}}
-records = {}   # "dist-g-wiek" -> {"t": czas, "h": [posiadacze]}
+records = {}   # "dist-g-wiek-H|S" -> {"t": czas, "h": [posiadacze]}
 
 for year, ms in sorted(seasons.items()):
     rounds = [fmt_round(d["meeting"], i + 1) for i, d in enumerate(ms)]
     planned = len(PLAN.get(year, [])) or len(rounds)
-    for i, date in enumerate(PLAN.get(year, [])[len(rounds):], start=len(rounds)):
-        rounds.append({"n": i + 1, "date": date, "id": None, "venue": None})
+    for i, p in enumerate(PLAN.get(year, [])[len(rounds):], start=len(rounds)):
+        date, venue = (p, None) if isinstance(p, str) else p
+        rounds.append({"n": i + 1, "date": date, "id": None, "venue": venue})
     # najlepszy wynik zawodnika w rundzie / dystansie
     best = {}   # (dist, g, yob, athleteId) -> {ri: time}
     ath = {}
@@ -54,9 +56,9 @@ for year, ms in sorted(seasons.items()):
     cats = collections.defaultdict(dict)
     for (dist, g, yob, aid), res in best.items():
         cats[(dist, g, yob)][aid] = res
-        # rekord WLB w kategorii wiekowej (dystans + płeć + wiek), ze wszystkich sezonów
+        # rekord WLB w kategorii wiekowej (dystans + płeć + wiek), osobno hala (H) i stadion (S)
         for ri, t in res.items():
-            rk = f"{dist}-{g}-{year - yob}"
+            rk = f"{dist}-{g}-{year - yob}-{'H' if rounds[ri]['venue'] == 'Hala' else 'S'}"
             hit = {"a": aid, "n": ath[aid][0], "c": ath[aid][1], "s": str(year), "y": yob,
                    "ri": ri, "date": rounds[ri]["date"]}
             rec = records.get(rk)
