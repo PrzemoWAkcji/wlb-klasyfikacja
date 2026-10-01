@@ -1,0 +1,285 @@
+<title>Klasyfikacja WLB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: wąska kolumna sterowania (sezon → dystans → płeć → rocznik), pod nią szeroka tabela jak arkusz z Excela; bieżnia jako jedyny motyw. */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fb;
+  --ink: #15203a;
+  --muted: #5d6679;
+  --line: #dde2ea;
+  --accent: #c8432b;          /* tartan bieżni */
+  --accent-soft: #fbe9e5;
+  --on-accent: #ffffff;
+  --gold: #f6d65b;  --gold-ink: #3d2f00;
+  --silver: #d6dbe3; --silver-ink: #1f2836;
+  --bronze: #e0a06d; --bronze-ink: #3a1d07;
+  --warn: #8a5a00;  --warn-bg: #fdf1d6;
+  --ok: #1d6b47;    --ok-bg: #def3e7;
+  --off: #8a2a3a;   --off-bg: #f8e1e5;
+  --hl: #fff6c9;
+  --f-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e131d; --surface: #151c29; --surface-2: #1a2232; --ink: #e5eaf2; --muted: #95a1b5; --line: #273246;
+  --accent: #ff6d4d; --accent-soft: #3a1f1a; --on-accent: #1a0904;
+  --gold: #6f5a0e; --gold-ink: #fff1b8; --silver: #4a5466; --silver-ink: #eef2f8; --bronze: #6e3d1b; --bronze-ink: #ffe0c7;
+  --warn: #f2c66b; --warn-bg: #3a2c0c; --ok: #7fd8a9; --ok-bg: #12301f; --off: #f19aa8; --off-bg: #3a1820; --hl: #3a3412;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e131d; --surface: #151c29; --surface-2: #1a2232; --ink: #e5eaf2; --muted: #95a1b5; --line: #273246;
+  --accent: #ff6d4d; --accent-soft: #3a1f1a; --on-accent: #1a0904;
+  --gold: #6f5a0e; --gold-ink: #fff1b8; --silver: #4a5466; --silver-ink: #eef2f8; --bronze: #6e3d1b; --bronze-ink: #ffe0c7;
+  --warn: #f2c66b; --warn-bg: #3a2c0c; --ok: #7fd8a9; --ok-bg: #12301f; --off: #f19aa8; --off-bg: #3a1820; --hl: #3a3412;
+  color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.45 var(--f-body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 0 48px; }
+header.top { padding-block: 22px 18px; display: grid; gap: 6px; }
+.lane { height: 8px; border-radius: 2px; background:
+  repeating-linear-gradient(90deg, transparent 0 46px, color-mix(in srgb, var(--on-accent) 80%, transparent) 46px 48px), var(--accent); }
+.eyebrow { font: 600 13px/1 var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 14px; }
+h1 { font: 700 clamp(30px, 5vw, 44px)/1.02 var(--f-display); margin: 0; text-wrap: balance; letter-spacing: .005em; }
+.status { color: var(--muted); font-size: 15px; }
+.status b { color: var(--ink); font-weight: 600; }
+
+.controls { display: grid; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.ctl-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.ctl-label { font: 600 12px/1 var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); width: 72px; flex: none; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.seg button { font: 600 15px/1 var(--f-body); color: var(--ink); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 8px 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.seg button small { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.seg button:hover { border-color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg button[aria-pressed="true"] small { color: inherit; opacity: .75; }
+.seg.dist button { font-family: var(--f-display); font-size: 18px; padding: 6px 14px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.search { position: relative; flex: 1 1 260px; max-width: 420px; }
+.search input { width: 100%; font: 400 15px var(--f-body); color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; }
+.hits { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / .14); max-height: 320px; overflow: auto; }
+.hits button { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; text-align: left; background: none;
+  border: 0; border-bottom: 1px solid var(--line); padding: 9px 12px; color: var(--ink); font: inherit; cursor: pointer; }
+.hits button:hover, .hits button:focus-visible { background: var(--surface-2); }
+.hits .club { color: var(--muted); font-size: 13px; }
+.hits .cat { color: var(--muted); font-size: 13px; text-align: right; grid-row: span 2; align-self: center; font-variant-numeric: tabular-nums; }
+.hits .none { padding: 10px 12px; color: var(--muted); }
+
+.cathead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; margin-top: 26px; margin-bottom: 10px; }
+.cathead h2 { font: 700 clamp(26px, 4vw, 34px)/1 var(--f-display); margin: 0; }
+.cathead h2 span { color: var(--muted); font-weight: 500; }
+.cathead .meta { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+.tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; white-space: nowrap; }
+thead th { position: sticky; top: 0; background: var(--surface-2); font: 600 12px/1.2 var(--f-body); color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; text-align: center; vertical-align: bottom; }
+thead th.rnd { font: 700 16px/1 var(--f-display); color: var(--ink); text-transform: none; letter-spacing: 0; }
+thead th.rnd small { display: block; font: 400 12px/1.3 var(--f-body); color: var(--muted); margin-top: 3px; }
+thead th.future { opacity: .45; }
+.c-rank { text-align: center; width: 44px; font: 700 20px/1 var(--f-display); }
+.c-name { position: sticky; left: 0; background: var(--surface); text-align: left; min-width: 190px; z-index: 1; border-right: 1px solid var(--line); }
+thead .c-name { background: var(--surface-2); z-index: 2; }
+.c-name .nm { font-weight: 600; }
+.c-name .cl { display: block; color: var(--muted); font-size: 12.5px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+td.res { text-align: center; padding: 4px 3px; min-width: 62px; }
+.res .p { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 5px; border-radius: 5px; font: 700 16px/1 var(--f-display); }
+.res .t { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.res .p.m1 { background: var(--gold); color: var(--gold-ink); }
+.res .p.m2 { background: var(--silver); color: var(--silver-ink); }
+.res .p.m3 { background: var(--bronze); color: var(--bronze-ink); }
+.res.drop { opacity: .42; }
+.res.drop .p { text-decoration: line-through; }
+td.future { background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--line) 60%, transparent) 6px 7px); }
+.num { text-align: center; font-weight: 600; }
+.num.big { font: 700 19px/1 var(--f-display); }
+.pill { display: inline-block; font: 600 12.5px/1 var(--f-body); padding: 5px 8px; border-radius: 999px; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.off { background: var(--off-bg); color: var(--off); }
+tr.split td { border-top: 2px solid var(--ink); }
+tr.hl td, tr.hl td.c-name { background: var(--hl); }
+tr:hover td { background: var(--surface-2); }
+tr:hover td.c-name { background: var(--surface-2); }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px 32px; margin-top: 26px; color: var(--muted); font-size: 14px; }
+.notes h3 { font: 700 18px/1.1 var(--f-display); color: var(--ink); margin: 0 0 6px; letter-spacing: .01em; }
+.notes p, .notes ul { margin: 0; max-width: 62ch; }
+.notes ul { padding-left: 18px; display: grid; gap: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.legend .res { display: inline-flex; align-items: center; gap: 6px; }
+.notes a { color: var(--accent); }
+@media (max-width: 560px) { .ctl-label { width: 100% } .c-name { min-width: 150px } .c-name .cl { max-width: 160px } }
+@media (prefers-reduced-motion: no-preference) { tr.hl td { transition: background .6s } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="lane" aria-hidden="true"></div>
+    <div class="eyebrow">Warszawska Liga Biegowa · AWF Warszawa</div>
+    <h1 id="title">Klasyfikacja generalna</h1>
+    <div class="status" id="status"></div>
+  </header>
+
+  <section class="controls" aria-label="Wybór kategorii">
+    <div class="ctl-row"><span class="ctl-label">Sezon</span><div class="seg" id="segSeason"></div></div>
+    <div class="ctl-row"><span class="ctl-label">Dystans</span><div class="seg dist" id="segDist"></div></div>
+    <div class="ctl-row"><span class="ctl-label">Płeć</span><div class="seg" id="segGender"></div></div>
+    <div class="ctl-row"><span class="ctl-label">Rocznik</span><div class="seg" id="segYear"></div></div>
+    <div class="ctl-row"><span class="ctl-label">Szukaj</span>
+      <div class="search"><input id="q" type="search" placeholder="Imię lub nazwisko dziecka" autocomplete="off" aria-label="Szukaj zawodnika">
+        <div class="hits" id="hits" hidden></div></div>
+    </div>
+  </section>
+
+  <div class="cathead"><h2 id="catTitle"></h2><div class="meta" id="catMeta"></div></div>
+  <div class="tablebox"><table id="tbl"></table></div>
+  <div class="legend">
+    <span class="res"><span class="p m1">1</span>1. miejsce w rundzie</span>
+    <span class="res"><span class="p m2">2</span>2.</span>
+    <span class="res"><span class="p m3">3</span>3.</span>
+    <span class="res drop"><span class="p">9</span>start spoza 7 najlepszych</span>
+    <span><span class="pill warn">brakuje 2</span> może jeszcze się zakwalifikować</span>
+    <span><span class="pill off">za mało startów</span> nie zdąży już zebrać 7</span>
+  </div>
+
+  <section class="notes">
+    <div><h3>Jak liczymy</h3>
+      <ul>
+        <li>Punkty w rundzie = miejsce w kategorii (rocznik, płeć, dystans): 1. miejsce to 1 pkt, 2. miejsce to 2 pkt itd.</li>
+        <li>Do klasyfikacji potrzeba co najmniej <b id="rMin">7</b> startów na danym dystansie. Liczy się suma <b id="rBest">7</b> najlepszych.</li>
+        <li>Wygrywa najmniejsza suma. Przy remisie decyduje najlepszy czas w sezonie.</li>
+        <li>Biegi łączone (np. „13–14 lat”) rozdzielamy na roczniki i przeliczamy miejsca osobno.</li>
+      </ul></div>
+    <div><h3>Skąd dane</h3>
+      <p>Wyniki pochodzą z publicznych wyników zawodów w Roster Athletics (organizator: Warszawska Liga Biegowa). Liczone są tylko ukończone biegi z czasem; DNS, DNF i DQ się nie liczą.</p>
+      <p style="margin-top:8px">To zestawienie nieoficjalne. Oficjalna klasyfikacja jest na <a href="https://www.warszawskaligabiegowa.pl" target="_blank" rel="noopener">warszawskaligabiegowa.pl</a>.</p>
+      <p style="margin-top:8px" id="gen"></p></div>
+  </section>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const $ = id => document.getElementById(id);
+const MONTHS = ["stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"];
+const G = { K: "Dziewczęta", M: "Chłopcy" };
+const fmtT = t => { const s = Math.floor(t / 100), c = String(t % 100).padStart(2, "0");
+  return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")},${c}` : `${s},${c}`; };
+const shortDate = d => { const [, m, dd] = d.split("-"); return `${+dd}.${m}`; };
+const longDate = d => { const [, m, dd] = d.split("-"); return `${+dd} ${MONTHS[+m - 1]}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const seasons = Object.keys(DATA.seasons).sort((a, b) => b - a);
+let st = { s: seasons[0], d: 60, g: "K", y: null, hl: null };
+
+function cats(s) { return DATA.seasons[s].cats; }
+function normalize() {
+  const cs = cats(st.s);
+  const dists = [...new Set(cs.map(c => c.d))].sort((a, b) => a - b);
+  if (!dists.includes(st.d)) st.d = dists[0];
+  let gs = [...new Set(cs.filter(c => c.d === st.d).map(c => c.g))];
+  if (!gs.includes(st.g)) st.g = gs[0];
+  const ys = cs.filter(c => c.d === st.d && c.g === st.g).map(c => c.y);
+  if (!ys.includes(st.y)) {
+    // przy zmianie sezonu zostajemy przy tym samym wieku, nie roczniku
+    ys.sort((a, b) => a - b);
+    st.y = ys.reduce((best, y) => st.y && Math.abs(y - st.y) < Math.abs(best - st.y) ? y : best, ys[ys.length - 1]);
+  }
+  return { dists, gs, ys };
+}
+
+function seg(el, items, cur, onPick) {
+  el.innerHTML = items.map(it => `<button type="button" data-v="${it.v}" aria-pressed="${String(it.v) === String(cur)}">${it.html}</button>`).join("");
+  el.onclick = e => { const b = e.target.closest("button"); if (b) onPick(b.dataset.v); };
+}
+
+function render() {
+  const { dists, gs, ys } = normalize();
+  const S = DATA.seasons[st.s];
+  const remaining = S.planned - S.done;
+  seg($("segSeason"), seasons.map(s => ({ v: s, html: s })), st.s, v => { const age = st.s - st.y; st.s = v; st.y = v - age; st.hl = null; render(); });
+  seg($("segDist"), dists.map(d => ({ v: d, html: `${d} m` })), st.d, v => { st.d = +v; st.hl = null; render(); });
+  seg($("segGender"), ["K", "M"].filter(g => gs.includes(g)).map(g => ({ v: g, html: G[g] })), st.g, v => { st.g = v; st.hl = null; render(); });
+  seg($("segYear"), [...ys].sort((a, b) => b - a).map(y => ({ v: y, html: `${st.s - y} lat<small>${y}</small>` })), st.y, v => { st.y = +v; st.hl = null; render(); });
+
+  $("title").textContent = `Klasyfikacja generalna ${st.s}`;
+  const next = S.rounds.find(r => !r.id);
+  $("status").innerHTML = remaining > 0
+    ? `Po <b>${S.done} z ${S.planned}</b> rund. Najbliższa runda: <b>${longDate(next.date)}</b>.`
+    : `Sezon zakończony: <b>${S.done} rund</b>.`;
+
+  const c = cats(st.s).find(c => c.d === st.d && c.g === st.g && c.y === st.y);
+  const nCls = c.rows.filter(r => r.rk).length;
+  $("catTitle").innerHTML = `${st.s - st.y} lat <span>· ${G[st.g].toLowerCase()} · ${st.d} m · rocznik ${st.y}</span>`;
+  $("catMeta").textContent = `${c.rows.length} ${c.rows.length === 1 ? "zawodnik" : "zawodników"} · ${nCls} sklasyfikowanych`;
+
+  const R = S.rounds;
+  let h = `<thead><tr><th class="c-rank" title="Miejsce w klasyfikacji">#</th><th class="c-name">Imię i nazwisko</th>`;
+  h += R.map(r => `<th class="rnd${r.id ? "" : " future"}" title="${r.venue || "runda zaplanowana"}">R${r.n}<small>${shortDate(r.date)}</small></th>`).join("");
+  h += `<th>Punkty<br>razem</th><th>Najlepsze ${DATA.rules.best}</th><th>Starty</th><th>Najlepszy<br>wynik</th><th>Ranking<br>wg czasu</th></tr></thead><tbody>`;
+  let prevCls = true;
+  for (const row of c.rows) {
+    const [name, club] = S.ath[row.a];
+    const cls = !!row.rk;
+    const split = prevCls && !cls && nCls > 0; prevCls = cls;
+    const need = DATA.rules.minStarts - row.s;
+    const pill = cls ? `<span class="num big">${row.b7}</span>`
+      : need <= remaining ? `<span class="pill warn" title="Zostało rund: ${remaining}">brakuje ${need}</span>`
+      : `<span class="pill off">za mało startów</span>`;
+    h += `<tr data-a="${row.a}" class="${split ? "split" : ""}${String(row.a) === String(st.hl) ? " hl" : ""}">`;
+    h += `<td class="c-rank">${cls ? row.rk : ""}</td><td class="c-name"><span class="nm">${esc(name)}</span><span class="cl">${esc(club)}</span></td>`;
+    R.forEach((r, i) => {
+      if (!r.id) { h += `<td class="future"></td>`; return; }
+      const x = row.r[i];
+      if (!x) { h += `<td class="res"></td>`; return; }
+      const [p, t, counted] = x;
+      h += `<td class="res${counted ? "" : " drop"}"${counted ? "" : ' title="Nie liczy się do 7 najlepszych"'}><span class="p${p <= 3 ? " m" + p : ""}">${p}</span><span class="t">${fmtT(t)}</span></td>`;
+    });
+    h += `<td class="num">${row.tot}</td><td class="num">${pill}</td><td class="num">${row.s}</td><td class="num">${fmtT(row.pb)}</td><td class="num">${row.tr}</td></tr>`;
+  }
+  h += `</tbody>`;
+  $("tbl").innerHTML = c.rows.length ? h : `<tbody><tr><td class="empty">Brak wyników w tej kategorii.</td></tr></tbody>`;
+
+  try { history.replaceState(null, "", `#s${st.s}-d${st.d}-g${st.g}-y${st.y}`); } catch (e) {}
+  if (st.hl) { const tr = document.querySelector(`tr[data-a="${st.hl}"]`); tr && tr.scrollIntoView({ block: "center", behavior: "smooth" }); }
+}
+
+// wyszukiwarka: wszystkie starty zawodnika w wybranym sezonie
+function search(q) {
+  const box = $("hits");
+  q = q.trim().toLowerCase();
+  if (q.length < 2) { box.hidden = true; return; }
+  const S = DATA.seasons[st.s], out = [];
+  for (const c of S.cats) for (const r of c.rows) {
+    const [n, club] = S.ath[r.a];
+    if (n.toLowerCase().includes(q)) out.push({ c, r, n, club });
+  }
+  out.sort((a, b) => a.n.localeCompare(b.n, "pl") || a.c.d - b.c.d);
+  box.innerHTML = out.length ? out.slice(0, 40).map((o, i) =>
+    `<button type="button" data-i="${i}"><span>${esc(o.n)}</span><span class="cat">${o.c.d} m · ${st.s - o.c.y} lat${o.r.rk ? ` · ${o.r.rk}. miejsce` : ""}</span><span class="club">${esc(o.club)}</span></button>`).join("")
+    : `<div class="none">Nikt taki nie startował w sezonie ${st.s}.</div>`;
+  box.hidden = false;
+  box.onclick = e => { const b = e.target.closest("button"); if (!b) return; const o = out[+b.dataset.i];
+    Object.assign(st, { d: o.c.d, g: o.c.g, y: o.c.y, hl: o.r.a }); box.hidden = true; render(); };
+}
+$("q").addEventListener("input", e => search(e.target.value));
+$("q").addEventListener("keydown", e => { if (e.key === "Escape") { $("hits").hidden = true; } });
+document.addEventListener("click", e => { if (!e.target.closest(".search")) $("hits").hidden = true; });
+
+const m = /^#s(\d{4})-d(\d+)-g([KM])-y(\d{4})$/.exec(location.hash);
+if (m && DATA.seasons[m[1]]) st = { s: m[1], d: +m[2], g: m[3], y: +m[4], hl: null };
+$("rMin").textContent = DATA.rules.minStarts; $("rBest").textContent = DATA.rules.best;
+const gd = new Date(DATA.generated);
+$("gen").textContent = `Dane pobrane: ${gd.toLocaleString("pl-PL", { dateStyle: "long", timeStyle: "short" })}.`;
+render();
+</script>
