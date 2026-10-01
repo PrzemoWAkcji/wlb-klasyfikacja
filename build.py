@@ -27,6 +27,7 @@ def fmt_round(m, n):
 
 out = {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
        "rules": {"minStarts": MIN_STARTS, "best": BEST_N}, "seasons": {}}
+records = {}   # "dist-g-wiek" -> {"t": czas, "h": [posiadacze]}
 
 for year, ms in sorted(seasons.items()):
     rounds = [fmt_round(d["meeting"], i + 1) for i, d in enumerate(ms)]
@@ -53,6 +54,16 @@ for year, ms in sorted(seasons.items()):
     cats = collections.defaultdict(dict)
     for (dist, g, yob, aid), res in best.items():
         cats[(dist, g, yob)][aid] = res
+        # rekord WLB w kategorii wiekowej (dystans + płeć + wiek), ze wszystkich sezonów
+        for ri, t in res.items():
+            rk = f"{dist}-{g}-{year - yob}"
+            hit = {"a": aid, "n": ath[aid][0], "c": ath[aid][1], "s": str(year), "y": yob,
+                   "ri": ri, "date": rounds[ri]["date"]}
+            rec = records.get(rk)
+            if rec is None or t < rec["t"]:
+                records[rk] = {"t": t, "h": [hit]}
+            elif t == rec["t"]:
+                rec["h"].append(hit)
     out_cats = []
     for (dist, g, yob), people in sorted(cats.items()):
         # miejsce w rundzie = pozycja czasu w kategorii (rocznik + płeć + dystans)
@@ -83,6 +94,9 @@ for year, ms in sorted(seasons.items()):
     used = {r["a"] for c in out_cats for r in c["rows"]}
     out["seasons"][str(year)] = {"rounds": rounds, "done": len(ms), "planned": planned, "cats": out_cats,
                                  "ath": {str(k): v for k, v in ath.items() if k in used}}
+for rec in records.values():
+    rec["h"].sort(key=lambda h: (h["date"], h["n"]))
+out["records"] = records
 
 data = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 tpl = open(os.path.join(HERE, "template.html"), encoding="utf-8").read()
