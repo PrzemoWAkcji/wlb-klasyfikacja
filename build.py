@@ -88,10 +88,12 @@ data = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 tpl = open(os.path.join(HERE, "template.html"), encoding="utf-8").read()
 page = tpl.replace("/*__DATA__*/null", data)
 # fragment dla artifactu Claude (on sam dokłada <html>/<head>)
-open(os.path.join(HERE, "wlb-klasyfikacja.html"), "w", encoding="utf-8").write(page)
-# pełny dokument dla GitHub Pages
+open(os.path.join(HERE, "wlb-klasyfikacja.html"), "w", encoding="utf-8").write(page.replace("<!--LOGO-->", ""))
+# pełny dokument dla GitHub Pages (z logo WLB z site/logo-wlb.png)
 os.makedirs(os.path.join(HERE, "site"), exist_ok=True)
+page = page.replace("<!--LOGO-->", '<img class="logo" src="logo-wlb.png" width="104" height="80" alt="Warszawska Liga Biegowa">')
 head, _, body = page.partition("</style>")
+head = head.replace("<title>", '<link rel="icon" href="logo-wlb.png">\n<title>', 1)
 full = f"""<!doctype html>
 <html lang="pl">
 <head>
