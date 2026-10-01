@@ -1,6 +1,6 @@
 # Klasyfikacja WLB
 
-Nieoficjalna klasyfikacja generalna Warszawskiej Ligi Biegowej liczona z wyników w Roster Athletics,
+Klasyfikacja generalna Warszawskiej Ligi Biegowej liczona z wyników w Roster Athletics,
 osobno dla dystansu, rocznika i płci, według regulaminu WLB.
 
 Strona: https://przemowakcji.github.io/wlb-klasyfikacja/

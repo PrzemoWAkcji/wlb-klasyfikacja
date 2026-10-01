@@ -99,7 +99,7 @@ full = f"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Nieoficjalna klasyfikacja generalna Warszawskiej Ligi Biegowej liczona z wyników Roster Athletics.">
+<meta name="description" content="Klasyfikacja generalna Warszawskiej Ligi Biegowej liczona z wyników Roster Athletics.">
 {head}
 body {{ margin: 0 }} [hidden] {{ display: none !important }}
 </style>
