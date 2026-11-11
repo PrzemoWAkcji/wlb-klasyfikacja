@@ -28,11 +28,13 @@ def fetch_meeting(m, force=False):
     recent = datetime.strptime(m["startDateTime"][:10], "%Y-%m-%d") > datetime.now() - timedelta(days=14)
     if os.path.exists(path) and not force and m["meetingStatus"] == "Finished" and not recent:
         data = json.load(open(path, encoding="utf-8"))
-        if "season" not in data["meeting"]:     # starszy cache bez typu obiektu – dopisujemy go
-            data["meeting"]["season"] = req(f"/meeting/{mid}/details").get("season")
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False)
-        return path
+        # cache zapisany, gdy runda była jeszcze otwarta (bez wyników), nie jest wiarygodny – pobieramy ponownie
+        if data["meeting"].get("meetingStatus") == "Finished":
+            if "season" not in data["meeting"]:     # starszy cache bez typu obiektu – dopisujemy go
+                data["meeting"]["season"] = req(f"/meeting/{mid}/details").get("season")
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
+            return path
     details = req(f"/meeting/{mid}/details")
     events = {e["eventIdPk"]: e["eventName"] for e in details.get("sportEvents", [])}
     sched = [x["entityDto"] for x in req(f"/meeting/{mid}/schedule")["data"]]
