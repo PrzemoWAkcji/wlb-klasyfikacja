@@ -1,0 +1,5 @@
+data/raw/
+data/meetings.json
+__pycache__/
+wlb-klasyfikacja.html
+update.log

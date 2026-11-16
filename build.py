@@ -1,0 +1,170 @@
+"""Liczy klasyfikację generalną WLB z data/raw/*.json i wstawia dane do szablonu strony."""
+import json, glob, os, re, collections, hashlib
+from ra import first_season
+from datetime import datetime, timezone
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+MIN_STARTS, BEST_N = 7, 7          # regulamin VIII.4
+AGE_MIN, AGE_MAX = 7, 14
+FIRST = first_season()             # imiennie publikujemy bieżący i dwa poprzednie sezony
+DIST = {"60m": 60, "300m": 300, "600m": 600}
+# terminarz z regulaminu (plan.py) – rundy jeszcze nierozegrane pokazujemy jako puste kolumny
+_plan_path = os.path.join(HERE, "data", "plan.json")
+PLAN = {int(k): v for k, v in json.load(open(_plan_path, encoding="utf-8")).items()} if os.path.exists(_plan_path) else {}
+
+meetings = []
+for f in glob.glob(os.path.join(HERE, "data", "raw", "*.json")):
+    d = json.load(open(f, encoding="utf-8"))
+    if d["rows"] and int(d["meeting"]["startDateTime"][:4]) >= FIRST:
+        meetings.append(d)
+meetings.sort(key=lambda d: d["meeting"]["startDateTime"])
+
+seasons = collections.defaultdict(list)
+for d in meetings:
+    seasons[int(d["meeting"]["startDateTime"][:4])].append(d)
+
+def fmt_round(m, n):
+    # typ obiektu z Roster: Indoor = hala, Outdoor = stadion
+    return {"n": n, "date": m["startDateTime"][:10], "id": m["meetingId"],
+            "venue": "Hala" if m.get("season") == "Indoor" else "Stadion"}
+
+out = {"generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
+       "rules": {"minStarts": MIN_STARTS, "best": BEST_N}, "seasons": {}}
+# Rekordy WLB zostają na stałe: data/records-archiwum.json trzyma najlepszy wynik w każdym sezonie
+# ("dist-g-wiek-H|S" -> sezon -> {"t": czas, "h": [{n, c, y, date}]}), czyli tylko imię i nazwisko,
+# rocznik, klub, wynik i datę. Sezony przeliczane teraz nadpisują swoje wpisy, starsze zostają.
+ARCHIVE_PATH = os.path.join(HERE, "data", "records-archiwum.json")
+archive = json.load(open(ARCHIVE_PATH, encoding="utf-8")) if os.path.exists(ARCHIVE_PATH) else {}
+processed = {str(y) for y in seasons}
+for rk in list(archive):
+    for y in processed:
+        archive[rk].pop(y, None)
+    if not archive[rk]:
+        del archive[rk]
+live = {}      # rk -> sezon -> {"t", "h"} z pełnymi danymi (numer zawodnika, runda) dla sezonów pokazywanych na stronie
+
+for year, ms in sorted(seasons.items()):
+    rounds = [fmt_round(d["meeting"], i + 1) for i, d in enumerate(ms)]
+    planned = len(PLAN.get(year, [])) or len(rounds)
+    for i, p in enumerate(PLAN.get(year, [])[len(rounds):], start=len(rounds)):
+        date, venue = (p, None) if isinstance(p, str) else p
+        rounds.append({"n": i + 1, "date": date, "id": None, "venue": venue})
+    # najlepszy wynik zawodnika w rundzie / dystansie
+    best = {}   # (dist, g, yob, athleteId) -> {ri: time}
+    ath = {}
+    for ri, d in enumerate(ms):
+        for r in d["rows"]:
+            if r["event"] not in DIST or not r["yob"] or not r["result"]:
+                continue
+            if r["startStatus"] != "Ok" or r["status"] != "Ok" or "specjal" in (r["label"] or "").lower():
+                continue
+            if not AGE_MIN <= year - r["yob"] <= AGE_MAX:
+                continue
+            g = "K" if r["gender"] == "Female" else "M"
+            key = (DIST[r["event"]], g, r["yob"], r["athleteId"])
+            t = round(r["result"] / 100)            # setne sekundy
+            cur = best.setdefault(key, {})
+            cur[ri] = min(t, cur.get(ri, t))
+            ath[r["athleteId"]] = [r["name"], r["club"] or ""]
+    cats = collections.defaultdict(dict)
+    for (dist, g, yob, aid), res in best.items():
+        cats[(dist, g, yob)][aid] = res
+        # rekord WLB w kategorii wiekowej (dystans + płeć + wiek), osobno hala (H) i stadion (S)
+        for ri, t in res.items():
+            rk = f"{dist}-{g}-{year - yob}-{'H' if rounds[ri]['venue'] == 'Hala' else 'S'}"
+            hit = {"a": aid, "n": ath[aid][0], "c": ath[aid][1], "s": str(year), "y": yob,
+                   "ri": ri, "date": rounds[ri]["date"]}
+            rec = live.setdefault(rk, {}).get(year)
+            if rec is None or t < rec["t"]:
+                live[rk][year] = {"t": t, "h": [hit]}
+            elif t == rec["t"]:
+                rec["h"].append(hit)
+    out_cats = []
+    for (dist, g, yob), people in sorted(cats.items()):
+        # miejsce w rundzie = pozycja czasu w kategorii (rocznik + płeć + dystans)
+        places = {}
+        for ri in range(len(ms)):
+            times = sorted(res[ri] for res in people.values() if ri in res)
+            for aid, res in people.items():
+                if ri in res:
+                    places[(aid, ri)] = 1 + times.index(res[ri])
+        rows = []
+        for aid, res in people.items():
+            pts = sorted(places[(aid, ri)] for ri in res)
+            starts = len(res)
+            # które starty liczą się do 7 najlepszych (najmniej punktów, przy remisie lepszy czas)
+            order = sorted(res, key=lambda ri: (places[(aid, ri)], res[ri]))
+            counted = set(order[:BEST_N])
+            rows.append({"a": aid, "r": [[places[(aid, ri)], res[ri], 1 if ri in counted else 0] if ri in res else 0
+                                          for ri in range(len(ms))],
+                         "tot": sum(pts), "b7": sum(pts[:BEST_N]), "s": starts, "pb": min(res.values())})
+        pbs = sorted(r["pb"] for r in rows)
+        for r in rows:
+            r["tr"] = 1 + pbs.index(r["pb"])
+        cls = sorted([r for r in rows if r["s"] >= MIN_STARTS], key=lambda r: (r["b7"], r["pb"]))
+        rest = sorted([r for r in rows if r["s"] < MIN_STARTS], key=lambda r: (-r["s"], r["tot"], r["pb"]))
+        for i, r in enumerate(cls):
+            r["rk"] = i + 1
+        out_cats.append({"d": dist, "g": g, "y": yob, "rows": cls + rest})
+    used = {r["a"] for c in out_cats for r in c["rows"]}
+    out["seasons"][str(year)] = {"rounds": rounds, "done": len(ms), "planned": planned, "cats": out_cats,
+                                 "ath": {str(k): v for k, v in ath.items() if k in used}}
+for rk, byyear in live.items():
+    for year, rec in byyear.items():
+        archive.setdefault(rk, {})[str(year)] = {"t": rec["t"], "h": [{k: h[k] for k in ("n", "c", "y", "date")} for h in rec["h"]]}
+records = {}
+for rk, byseason in archive.items():
+    best = min(v["t"] for v in byseason.values())
+    hits = []
+    for y, v in byseason.items():
+        if v["t"] == best:
+            hits += live[rk][int(y)]["h"] if y in processed else [{**h, "s": y} for h in v["h"]]
+    hits.sort(key=lambda h: (h["date"], h["n"]))
+    records[rk] = {"t": best, "h": hits}
+out["records"] = records
+with open(ARCHIVE_PATH, "w", encoding="utf-8") as f:
+    json.dump(archive, f, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+# numery zawodników z Roster zastępujemy kolejnymi numerami: strona ich nie pokazuje, a służą tylko do łączenia danych
+ids = sorted({int(a) for s in out["seasons"].values() for a in s["ath"]})
+pid = {a: i + 1 for i, a in enumerate(ids)}
+for s in out["seasons"].values():
+    s["ath"] = {str(pid[int(a)]): v for a, v in s["ath"].items()}
+    for c in s["cats"]:
+        for r in c["rows"]:
+            r["a"] = pid[r["a"]]
+for rec in records.values():
+    for h in rec["h"]:
+        if "a" in h:
+            h["a"] = pid[h["a"]]
+
+data = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+tpl = open(os.path.join(HERE, "template.html"), encoding="utf-8").read()
+page = tpl.replace("/*__DATA__*/null", data)
+# fragment dla artifactu Claude (on sam dokłada <html>/<head>)
+open(os.path.join(HERE, "wlb-klasyfikacja.html"), "w", encoding="utf-8").write(page.replace("<!--LOGO-->", ""))
+# pełny dokument dla GitHub Pages (z logo WLB z site/logo-wlb.png)
+os.makedirs(os.path.join(HERE, "site"), exist_ok=True)
+page = page.replace("<!--LOGO-->", '<img class="logo" src="logo-wlb.png" width="104" height="80" alt="Warszawska Liga Biegowa">')
+head, _, body = page.partition("</style>")
+head = head.replace("<title>", '<link rel="icon" href="logo-wlb.png">\n<title>', 1)
+full = f"""<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Klasyfikacja generalna Warszawskiej Ligi Biegowej liczona z wyników Roster Athletics.">
+{head}
+body {{ margin: 0 }} [hidden] {{ display: none !important }}
+</style>
+</head>
+<body>
+{body}
+</body>
+</html>
+"""
+open(os.path.join(HERE, "site", "index.html"), "w", encoding="utf-8").write(full)
+# skrót danych bez znacznika czasu – update.py porównuje go, żeby wiedzieć, czy coś się zmieniło
+digest = hashlib.sha256(json.dumps({**out, "generated": None}, sort_keys=True).encode()).hexdigest()
+open(os.path.join(HERE, "data", "data.sha256"), "w").write(digest)
+print("seasons:", {y: (s["done"], len(s["cats"])) for y, s in out["seasons"].items()}, "bytes:", len(data))
