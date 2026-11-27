@@ -79,7 +79,21 @@ def fetch_meeting(m, force=False):
     return path
 
 if __name__ == "__main__":
-    ms = [m for m in list_meetings() if int(m["startDateTime"][:4]) >= first_season()]   # starsze sezony nie są publikowane
+    first = first_season()
+    # Cache GitHub Actions może zawierać wyniki z poprzednich okresów retencji.
+    # Usuwamy je przed odświeżeniem, żeby nie wracały do danych roboczych.
+    for name in os.listdir(RAW):
+        path = os.path.join(RAW, name)
+        if not name.endswith(".json") or not os.path.isfile(path):
+            continue
+        try:
+            cached = json.load(open(path, encoding="utf-8"))
+            year = int(cached["meeting"]["startDateTime"][:4])
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            continue
+        if year < first:
+            os.remove(path)
+    ms = [m for m in list_meetings() if int(m["startDateTime"][:4]) >= first]   # starsze sezony nie są publikowane
     with open(os.path.join(os.path.dirname(__file__), "data", "meetings.json"), "w", encoding="utf-8") as f:
         json.dump(ms, f, ensure_ascii=False, indent=1)
     for m in ms:
