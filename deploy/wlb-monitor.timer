@@ -1,0 +1,10 @@
+[Unit]
+Description=Start monitora finału WLB 13 grudnia 2026
+
+[Timer]
+OnCalendar=2026-12-13 08:00:00 Europe/Warsaw
+Persistent=true
+Unit=wlb-monitor.service
+
+[Install]
+WantedBy=timers.target

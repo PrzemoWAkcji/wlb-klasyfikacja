@@ -1,0 +1,19 @@
+[Unit]
+Description=Rekordy halowe i podium finału WLB na Telegramie
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/opt/wlb-monitor
+ExecStartPre=/usr/bin/python3 fetch.py
+ExecStart=/usr/bin/python3 monitor.py --config %h/.config/wlb-monitor/config.json
+Restart=on-failure
+RestartSec=60
+TimeoutStartSec=900
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

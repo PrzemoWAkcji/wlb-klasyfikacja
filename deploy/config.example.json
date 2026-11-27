@@ -1,0 +1,9 @@
+{
+  "date": "2026-12-13",
+  "end_date": "2026-12-14",
+  "interval": 30,
+  "expected_prior_rounds": 9,
+  "data_dir": "/home/przemo/opt/wlb-monitor/data",
+  "telegram_token": "",
+  "chat_id": ""
+}
